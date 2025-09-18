@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
 
+// Bundler-safe API base (no process/import.meta)
+const API_BASE =
+  (typeof window !== 'undefined' && window.__API_BASE__) ||
+  (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost'
+    ? 'http://localhost:8080'
+    : `${window.location.protocol}//${window.location.host}`);
+
+const imgUrl = (id, bust) => `${API_BASE}/public/candidates/${id}/image${bust ? `?t=${bust}` : ''}`;
+
 function VotePage({ token }) {
   const [candidateId, setCandidateId] = useState('');
   const [hoveredId, setHoveredId] = useState(null);
   const [candidates, setCandidates] = useState([]);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/candidates', {
+    fetch(`${API_BASE}/api/candidates`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -15,7 +24,7 @@ function VotePage({ token }) {
   }, [token]);
 
   const submitVote = async () => {
-    const response = await fetch('http://localhost:8080/api/vote', {
+    const response = await fetch(`${API_BASE}/api/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ candidateId }),
@@ -25,9 +34,10 @@ function VotePage({ token }) {
 
   return (
     <div style={styles.machineContainer}>
-  <div style={styles.backgroundTexture}></div> {/* subtle 3D texture */}
-  <h2 style={styles.title}>🗳️ Bishop Heber College Voting Machine</h2>
-  <div style={styles.machine}>
+      <div style={styles.backgroundTexture} />
+      <h2 style={styles.title}>🗳️ Bishop Heber College Voting Machine</h2>
+
+      <div style={styles.machine}>
         {candidates.map(candidate => {
           const expanded = hoveredId === candidate.id;
           return (
@@ -43,10 +53,28 @@ function VotePage({ token }) {
               }}
             >
               <div style={styles.row}>
-                <div style={styles.symbol}>{candidate.symbol || '🎓'}</div>
+                {/* PHOTO with graceful fallback to symbol if image missing */}
+                <div style={styles.photoWrap}>
+                  <img
+                    src={imgUrl(candidate.id)}
+                    alt={candidate.name || 'candidate'}
+                    style={styles.photo}
+                    onError={(e) => {
+                      // Hide image; show the fallback emoji box behind it
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextSibling;
+                      if (fallback) fallback.style.display = 'grid';
+                    }}
+                  />
+                  <div style={{ ...styles.symbolFallback, display: 'none' }}>
+                    {candidate.symbol || '🎓'}
+                  </div>
+                </div>
+
                 <div style={styles.info}>
                   <div style={styles.name}>{candidate.name}</div>
                 </div>
+
                 <div style={styles.voteLight}>
                   {candidateId === candidate.id ? '🟢' : '⚪️'}
                 </div>
@@ -57,8 +85,8 @@ function VotePage({ token }) {
                 aria-hidden={!expanded}
                 style={{
                   ...styles.expand,
-                  maxHeight: expanded ? 500 : 0,          // animate height
-                  opacity: expanded ? 1 : 0,              // fade in
+                  maxHeight: expanded ? 500 : 0,
+                  opacity: expanded ? 1 : 0,
                 }}
               >
                 {candidate.description && (
@@ -103,19 +131,14 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-
-    /* 3D gradient background */
     background: `
       radial-gradient(circle at top left, rgba(46, 204, 113, 0.25), transparent 70%),
       radial-gradient(circle at bottom right, rgba(52, 152, 219, 0.25), transparent 70%),
       linear-gradient(135deg, #eaf6f0 0%, #e0f3ff 100%)
     `,
     backgroundAttachment: 'fixed',
-
-    /* Soft 3D "paper" texture */
     position: 'relative',
   },
-
   backgroundTexture: {
     position: 'absolute',
     inset: 0,
@@ -126,7 +149,6 @@ const styles = {
     pointerEvents: 'none',
     zIndex: 0,
   },
-
   title: {
     marginBottom: '2rem',
     color: '#2c3e50',
@@ -154,16 +176,40 @@ const styles = {
   },
   row: {
     display: 'grid',
-    gridTemplateColumns: '40px 1fr 32px',
+    gridTemplateColumns: '56px 1fr 32px',
     alignItems: 'center',
     columnGap: '10px',
   },
-  symbol: { fontSize: '1.8rem' },
+
+  // Photo & fallback styles
+  photoWrap: {
+    position: 'relative',
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    overflow: 'hidden',
+    border: '1px solid #e7eff7',
+    background: 'linear-gradient(135deg, #eef7ff, #f4fff4)',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+  symbolFallback: {
+    position: 'absolute',
+    inset: 0,
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: '1.8rem',
+    color: '#111827',
+  },
+
   info: { minWidth: 0 },
   name: { fontWeight: 'bold', fontSize: '1.05rem', color: '#2c3e50' },
   voteLight: { fontSize: '1.6rem', justifySelf: 'end' },
 
-  // Expandable section
   expand: {
     overflow: 'hidden',
     transition: 'max-height 220ms ease, opacity 180ms ease',
