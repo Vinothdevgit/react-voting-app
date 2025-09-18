@@ -1,0 +1,80 @@
+.bhc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.bhc-card {
+  position: relative;
+  border-radius: 14px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.95));
+  box-shadow:
+    0 10px 25px rgba(0,0,0,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+  transform-style: preserve-3d;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.bhc-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 32px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.7);
+}
+
+.bhc-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 16px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,90,0,0.35), rgba(255,0,90,0.25));
+  filter: blur(18px);
+  opacity: 0.2;
+  transform: translateZ(-1px);
+}
+
+.bhc-title {
+  margin: 0 0 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.bhc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bhc-item {
+  padding: 10px 0;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.bhc-item:first-child {
+  border-top: 0;
+}
+
+.bhc-item a {
+  color: #e23a0b;              /* accent link like site’s orange/red */
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.bhc-item a:hover {
+  text-decoration: underline;
+}
+
+.bhc-inline { /* the sanitized HTML goes here */
+  color: #1f2937;              /* neutral-800 */
+  line-height: 1.5;
+  font-size: 0.98rem;
+}
+
+@media (max-width: 900px) {
+  .bhc-grid { grid-template-columns: 1fr; }
+}
