@@ -1,15 +1,40 @@
 import React, { useState, useEffect } from 'react';
 
 /**
- * Page for adding a new election candidate.
+ * Page for adding a new election candidate (with image upload).
  */
 function AddCandidatePage({ token }) {
   const [form, setForm] = useState({
     name: '',
     description: '',
-    symbol: '',
     promisesText: '',
+    imageFile: null,
+    imagePreview: null,
   });
+
+  const onImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setForm(f => ({ ...f, imageFile: null, imagePreview: null }));
+      return;
+    }
+    // basic validation (optional)
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Max image size is 5MB.');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setForm(f => ({ ...f, imageFile: file, imagePreview: url }));
+  };
+
+  const clearImage = () => {
+    if (form.imagePreview) URL.revokeObjectURL(form.imagePreview);
+    setForm(f => ({ ...f, imageFile: null, imagePreview: null }));
+  };
 
   const addCandidate = async () => {
     const promises = form.promisesText
@@ -17,27 +42,30 @@ function AddCandidatePage({ token }) {
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
 
-    const candidateData = {
-      name: form.name,
-      description: form.description,
-      symbol: form.symbol,
-      promises,
-    };
+    // Build multipart payload
+    const fd = new FormData();
+    fd.append('name', form.name);
+    fd.append('description', form.description || '');
+    fd.append('promises', JSON.stringify(promises));
+    if (form.imageFile) fd.append('image', form.imageFile);
 
     try {
       const response = await fetch('http://localhost:8080/admin/candidate/add', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          // DO NOT set Content-Type for FormData; the browser will set it with the correct boundary.
+          Authorization: token ? `Bearer ${token}` : undefined,
         },
-        body: JSON.stringify(candidateData),
+        body: fd,
       });
+
       if (response.ok) {
         alert('✅ Candidate added successfully');
-        setForm({ name: '', description: '', symbol: '', promisesText: '' });
+        if (form.imagePreview) URL.revokeObjectURL(form.imagePreview);
+        setForm({ name: '', description: '', promisesText: '', imageFile: null, imagePreview: null });
       } else {
-        alert('❌ Failed to add candidate');
+        const msg = await response.text().catch(() => '');
+        alert(`❌ Failed to add candidate${msg ? `: ${msg}` : ''}`);
       }
     } catch (err) {
       console.error('Error adding candidate:', err);
@@ -88,13 +116,22 @@ function AddCandidatePage({ token }) {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             style={styles.input}
           />
+        </div>
 
-          <input
-            placeholder="Symbol (e.g. 🎓)"
-            value={form.symbol}
-            onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-            style={styles.input}
-          />
+        {/* Image upload */}
+        <label style={styles.label}>Candidate Image</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <input type="file" accept="image/*" onChange={onImageChange} />
+          {form.imagePreview && (
+            <>
+              <img
+                src={form.imagePreview}
+                alt="preview"
+                style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 12, border: `1px solid ${borderLight}` }}
+              />
+              <button type="button" onClick={clearImage} style={styles.secondaryBtn}>Remove</button>
+            </>
+          )}
         </div>
 
         <label style={styles.label}>Promises (one per line)</label>
@@ -124,8 +161,6 @@ const styles = {
     fontFamily: 'Segoe UI, system-ui, -apple-system, Arial, sans-serif',
     overflow: 'hidden',
   },
-
-  // Subtle voting-themed background (mint/blue + paper texture)
   bg: {
     position: 'absolute',
     inset: 0,
@@ -139,7 +174,6 @@ const styles = {
       repeating-linear-gradient(-45deg, rgba(0,0,0,0.018) 0 1px, transparent 1px 7px)
     `,
   },
-
   card: {
     width: '100%',
     maxWidth: 720,
@@ -150,7 +184,6 @@ const styles = {
     boxShadow: '0 14px 36px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.65)',
     backdropFilter: 'blur(2px)',
   },
-
   title: {
     textAlign: 'center',
     margin: '0 0 1.25rem',
@@ -160,15 +193,12 @@ const styles = {
     letterSpacing: 0.2,
     textShadow: '0 1px 0 rgba(255,255,255,0.7)',
   },
-
-  // three tidy rows (on wide screens it stays centered)
   formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr',
     gap: 12,
     marginBottom: '1rem',
   },
-
   input: {
     width: '100%',
     height: 44,
@@ -179,7 +209,6 @@ const styles = {
     background: '#ffffff',
     boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
   },
-
   label: {
     fontWeight: 700,
     color: '#374151',
@@ -187,7 +216,6 @@ const styles = {
     marginTop: 6,
     marginBottom: 6,
   },
-
   textarea: {
     width: '100%',
     minHeight: 150,
@@ -200,7 +228,6 @@ const styles = {
     resize: 'vertical',
     marginBottom: '1rem',
   },
-
   button: {
     width: '100%',
     height: 46,
@@ -214,6 +241,14 @@ const styles = {
     letterSpacing: 0.2,
     boxShadow: '0 12px 26px rgba(2,132,199,0.28), inset 0 1px 0 rgba(255,255,255,0.55)',
     transition: 'transform 0.06s ease, box-shadow 0.15s ease, filter 0.15s ease',
+  },
+  secondaryBtn: {
+    height: 36,
+    padding: '0 12px',
+    borderRadius: 10,
+    border: `1px solid ${borderLight}`,
+    background: '#f9fafb',
+    cursor: 'pointer',
   },
 };
 

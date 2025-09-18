@@ -1,12 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+// Bundler-safe API base (no process/import.meta)
+const API_BASE =
+  (typeof window !== 'undefined' && window.__API_BASE__) ||
+  (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost'
+    ? 'http://localhost:8080'
+    : `${window.location.protocol}//${window.location.host}`);
+
+function imageUrl(id, bust) {
+  const q = bust ? `?t=${bust}` : '';
+  return `${API_BASE}/public/candidates/${id}/image${q}`;
+}
+
 /**
  * AdminCandidatesPage
- * - Lists candidates in a responsive grid
+ * - Lists candidates with photo
  * - Quick search
- * - NEW: Edit/Delete for each candidate
- * - NEW: "Manage Promises" link per candidate
+ * - Edit/Delete per candidate
+ * - Edit allows replacing image (multipart PUT)
  */
 function CandidatesPage({ token }) {
   const [candidates, setCandidates] = useState([]);
@@ -22,11 +34,14 @@ function CandidatesPage({ token }) {
     name: '',
     description: '',
     symbol: '',
+    promises: [],
+    imageFile: null,      // new file to upload
+    imagePreview: null,   // preview (existing or newly selected)
   });
 
   useEffect(() => {
     setLoading(true);
-    fetch('http://localhost:8080/admin/candidates', {
+    fetch(`${API_BASE}/admin/candidates`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -52,32 +67,75 @@ function CandidatesPage({ token }) {
   const openEdit = (c) => {
     setEditId(c.id);
     setEditForm({
-      promises: (Array.isArray(c.promises) ? c.promises.map(p => typeof p === 'string' ? p : (p?.promiseText || '')).filter(s => typeof s === 'string') : []),
       name: c.name || '',
       description: c.description || '',
       symbol: c.symbol || '',
+      promises: (Array.isArray(c.promises)
+        ? c.promises.map(p => (typeof p === 'string' ? p : (p?.promiseText || ''))).filter(Boolean)
+        : []),
+      imageFile: null,
+      imagePreview: imageUrl(c.id, Date.now()), // show current image if present
     });
     setIsOpen(true);
   };
+
   const closeEdit = () => {
     if (saving) return;
     setIsOpen(false);
     setEditId(null);
   };
+
+  const onEditImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setEditForm(f => ({ ...f, imageFile: null, imagePreview: imageUrl(editId, Date.now()) }));
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Max image size is 5MB.');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setEditForm(f => ({ ...f, imageFile: file, imagePreview: url }));
+  };
+
   const saveEdit = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`http://localhost:8080/admin/candidate/${editId}`, {
+      const fd = new FormData();
+      fd.append('name', editForm.name);
+      fd.append('description', editForm.description || '');
+      fd.append('promises', JSON.stringify((editForm.promises || []).map(String)));
+      // Only append image if user picked a new file; if not, backend keeps old image
+      if (editForm.imageFile) fd.append('image', editForm.imageFile);
+
+      const res = await fetch(`${API_BASE}/admin/candidate/${editId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ...editForm, promises: (editForm.promises || []).map(p => typeof p === "string" ? p : (p?.promiseText || "")) }),
+        headers: { Authorization: `Bearer ${token}` }, // no Content-Type on FormData
+        body: fd,
       });
       if (!res.ok) throw new Error('Save failed');
-      // Optimistic local update
-      setCandidates(prev => prev.map(c => (c.id === editId ? { ...c, ...editForm } : c)));
+
+      // Update list locally; bump cache-buster for the edited card
+      setCandidates(prev =>
+        prev.map(c =>
+          c.id === editId
+            ? {
+                ...c,
+                name: editForm.name,
+                description: editForm.description,
+                symbol: editForm.symbol,
+                promises: [...(editForm.promises || [])],
+                __imgBust: Date.now(),
+              }
+            : c
+        )
+      );
+
       setIsOpen(false);
       setEditId(null);
     } catch (e) {
@@ -93,7 +151,7 @@ function CandidatesPage({ token }) {
     if (!window.confirm('Delete this candidate? This cannot be undone.')) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`http://localhost:8080/admin/candidate/${id}`, {
+      const res = await fetch(`${API_BASE}/admin/candidate/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -130,7 +188,23 @@ function CandidatesPage({ token }) {
           {filtered.map(c => (
             <article key={c.id} style={styles.card}>
               <div style={styles.cardTop}>
-                <div style={styles.symbol}>{c.symbol || '🎓'}</div>
+                <div style={styles.photoWrap}>
+                  <img
+                    src={imageUrl(c.id, c.__imgBust)}
+                    alt={c.name || 'candidate'}
+                    style={styles.photo}
+                    onError={(e) => {
+                      // Hide the image and show fallback emoji box
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextSibling;
+                      if (fallback) fallback.style.display = 'grid';
+                    }}
+                  />
+                  <div style={{ ...styles.symbol, display: 'none' }}>
+                    {c.symbol || '🎓'}
+                  </div>
+                </div>
+
                 <div style={styles.meta}>
                   <div style={styles.nameRow}>
                     <span style={styles.name}>{c.name}</span>
@@ -161,7 +235,6 @@ function CandidatesPage({ token }) {
                 </div>
 
                 <div style={styles.actions}>
-
                   <button
                     style={{ ...styles.btn, ...styles.btnGhost }}
                     onClick={() => openEdit(c)}
@@ -169,7 +242,6 @@ function CandidatesPage({ token }) {
                   >
                     ✏️ Edit
                   </button>
-
                   <button
                     style={{ ...styles.btn, ...styles.btnDanger }}
                     onClick={() => deleteCandidate(c.id)}
@@ -200,8 +272,7 @@ function CandidatesPage({ token }) {
                 <input
                   style={styles.formInput}
                   value={editForm.name}
-                  onChange={(e) => setEditForm({
-      promises: (Array.isArray(c.promises) ? c.promises.map(p => typeof p === 'string' ? p : (p?.promiseText || '')).filter(s => typeof s === 'string') : []), ...editForm, name: e.target.value })}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                 />
               </div>
 
@@ -210,21 +281,26 @@ function CandidatesPage({ token }) {
                 <input
                   style={styles.formInput}
                   value={editForm.description}
-                  onChange={(e) => setEditForm({
-      promises: (Array.isArray(c.promises) ? c.promises.map(p => typeof p === 'string' ? p : (p?.promiseText || '')).filter(s => typeof s === 'string') : []), ...editForm, description: e.target.value })}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 />
               </div>
 
+              {/* Replace/Upload image */}
               <div style={styles.formRow}>
-                <label style={styles.formLabel}>Symbol (emoji or short text)</label>
-                <input
-                  style={styles.formInput}
-                  value={editForm.symbol}
-                  onChange={(e) => setEditForm({
-      promises: (Array.isArray(c.promises) ? c.promises.map(p => typeof p === 'string' ? p : (p?.promiseText || '')).filter(s => typeof s === 'string') : []), ...editForm, symbol: e.target.value })}
-                  maxLength={4}
-                />
+                <label style={styles.formLabel}>Photo</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input type="file" accept="image/*" onChange={onEditImageChange} />
+                  {editForm.imagePreview && (
+                    <img
+                      src={editForm.imagePreview}
+                      alt="preview"
+                      style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10, border: '1px solid #e6eef7' }}
+                    />
+                  )}
+                </div>
+                <small style={{ color: '#6b7280' }}>Leave empty to keep existing photo.</small>
               </div>
+
               <div style={styles.formRow}>
                 <label style={styles.formLabel}>Promises</label>
                 <div>
@@ -242,7 +318,7 @@ function CandidatesPage({ token }) {
                       />
                       <button
                         type="button"
-                        style={styles.secondaryButton}
+                        style={styles.btn}
                         onClick={() => {
                           const arr = [...(editForm.promises || [])];
                           arr.splice(idx, 1);
@@ -255,17 +331,13 @@ function CandidatesPage({ token }) {
                   ))}
                   <button
                     type="button"
-                    style={styles.primaryButton}
-                    onClick={() => setEditForm({ 
-                      ...editForm, 
-                      promises: [...(editForm.promises || []), ''] 
-                    })}
+                    style={{ ...styles.btn, ...styles.btnPrimary }}
+                    onClick={() => setEditForm({ ...editForm, promises: [...(editForm.promises || []), ''] })}
                   >
                     + Add promise
                   </button>
                 </div>
               </div>
-    
             </div>
 
             <div style={styles.modalFooter}>
@@ -338,15 +410,29 @@ const styles = {
     alignItems: 'flex-start',
     marginBottom: 8,
   },
-  symbol: {
+  photoWrap: {
+    position: 'relative',
     width: 56,
     height: 56,
     borderRadius: 12,
+    overflow: 'hidden',
+    border: '1px solid #e7eff7',
+    background: 'linear-gradient(135deg, #eef7ff, #f4fff4)',
+    display: 'block',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+  symbol: {
+    position: 'absolute',
+    inset: 0,
     display: 'grid',
     placeItems: 'center',
     fontSize: '1.8rem',
-    background: 'linear-gradient(135deg, #eef7ff, #f4fff4)',
-    border: '1px solid #e7eff7',
+    color: '#111827',
   },
   meta: { minWidth: 0 },
   nameRow: {
@@ -436,11 +522,6 @@ const styles = {
     gap: 6,
   },
   btnGhost: { background: '#ffffff', color: '#111827' },
-  btnInfo: {
-    background: 'linear-gradient(135deg, #06b6d4, #0ea5e9)',
-    color: '#fff',
-    border: 'none',
-  },
   btnPrimary: {
     background: 'linear-gradient(135deg, #2563eb, #0ea5e9)',
     color: '#fff',
