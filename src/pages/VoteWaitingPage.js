@@ -34,9 +34,9 @@ function VoteWaitingPage() {
         {minutes}:{secs.toString().padStart(2, '0')}
       </div>
 
-      <div style={styles.gameContainer}>
+      {/* <div style={styles.gameContainer}>
         <DinoGame />
-      </div>
+      </div> */}
     </div>
   );
 }
