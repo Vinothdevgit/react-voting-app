@@ -30,7 +30,7 @@ function LoginPage({ setToken, setRole }) {
     <div style={styles.container}>
       <div style={styles.card} className="glow-box">
         <img src="/web-logo.png" alt="BHC Logo" style={styles.logo} className="floating-logo" />
-        <h2 style={styles.title} className="glow-text">Online Voting System</h2>
+        <h2 style={styles.title} className="glow-text">ePoll System</h2>
 
       <div style={styles.form}>
       <div className="input-group">

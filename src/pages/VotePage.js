@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 
 // Bundler-safe API base (no process/import.meta)
 const API_BASE =
@@ -12,7 +13,8 @@ const imgUrl = (id, bust) => `${API_BASE}/public/candidates/${id}/image${bust ? 
 function VotePage({ token }) {
   const [candidateId, setCandidateId] = useState('');
   const [hoveredId, setHoveredId] = useState(null);
-  const [candidates, setCandidates] = useState([]);
+  const [candidates, setCandidates] = useState([]); 
+  const navigate = useNavigate(); 
 
   useEffect(() => {
     fetch(`${API_BASE}/api/candidates`, {
@@ -24,13 +26,36 @@ function VotePage({ token }) {
   }, [token]);
 
   const submitVote = async () => {
+  try {
     const response = await fetch(`${API_BASE}/api/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ candidateId }),
     });
-    alert(response.ok ? '✅ Your vote has been recorded!' : '❌ Vote failed');
-  };
+
+    if (response.ok) {
+      // navigate first so routing happens immediately (alert is blocking)
+      navigate('/waiting');
+
+      // show confirmation non-blocking after a tick (or use a toast/snackbar)
+      setTimeout(() => {
+        // use a non-blocking toast if you have one; fallback to alert
+        alert('✅ Your vote has been recorded!');
+      }, 150);
+    } else if (response.status === 409) {
+      // duplicate vote
+      alert('❌ You have already voted.');
+    } else {
+      const text = await response.text().catch(() => '');
+      console.error('Vote failed:', response.status, text);
+      alert('❌ Vote failed; please try again.');
+    }
+  } catch (err) {
+    console.error('Network error', err);
+    alert('❌ Network error while submitting vote');
+  }
+};
+
 
   return (
     <div style={styles.machineContainer}>

@@ -13,6 +13,8 @@ import AddUserPage from './pages/AddUserPage';
 import AddCandidatePage from './pages/AddCandidatePage';
 import ViewVotesPage from './pages/ViewVotesPage';
 import ViewCandidatesPage from './pages/CandidatesPage';
+import ResultsPage from './pages/ResultsPage';
+import VoteWaitingPage from './pages/VoteWaitingPage';
 import Layout from './components/Layout';
 
 function App() {
@@ -47,7 +49,7 @@ function App() {
           <Routes>
             {role === 'ADMIN' && (
               <>
-                <Route path="/admin/dashboard" element={<Dashboard />} />
+                {/* <Route path="/admin/dashboard" element={<Dashboard />} /> */}
                 <Route path="/admin/add-user" element={<AddUserPage token={token} />} />
                 {/* Provide a route to add new candidates. Only admins can access this. */}
                 <Route path="/admin/add-candidate" element={<AddCandidatePage token={token} />} />
@@ -56,7 +58,9 @@ function App() {
               </>
             )}
             {role === 'USER' && <Route path="/vote" element={<VotePage token={token} />} />}
-            <Route path="*" element={<Navigate to={role === 'ADMIN' ? '/admin/dashboard' : '/vote'} />} />
+            <Route path="/vote" element={<Navigate to={role === 'ADMIN' ? '/admin/dashboard' : '/vote'} />} />
+            <Route path="/results" element={<ResultsPage token={token} />} />
+            <Route path="/waiting" element={<VoteWaitingPage />} />
           </Routes>
         </Layout>
 

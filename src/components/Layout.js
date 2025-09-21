@@ -27,7 +27,7 @@ function Layout({ children, setToken, setRole }) {
           <h3 style={styles.menuTitle}>Menu</h3>
           {role === 'ADMIN' && (
             <>
-              <Link to="/admin/dashboard"     style={{ ...styles.navLink, backgroundColor: '#ffeaa7' }}>🏠 Dashboard</Link>
+              {/* <Link to="/admin/dashboard"     style={{ ...styles.navLink, backgroundColor: '#ffeaa7' }}>🏠 Dashboard</Link> */}
               <Link to="/admin/add-user"      style={{ ...styles.navLink, backgroundColor: '#fab1a0' }}>➕ Add User</Link>
               <Link to="/admin/add-candidate" style={{ ...styles.navLink, backgroundColor: '#74b9ff' }}>🆕 Add Candidate</Link>
               <Link to="/admin/view-votes"    style={{ ...styles.navLink, backgroundColor: '#81ecec' }}>📊 View Votes</Link>
@@ -37,6 +37,7 @@ function Layout({ children, setToken, setRole }) {
           {role === 'USER' && (
             <Link to="/vote" style={{ ...styles.navLink, backgroundColor: '#a29bfe' }}>🗳️ Vote</Link>
           )}
+          <Link to="/results" style={{ ...styles.navLink, backgroundColor: '#a29bfe' }}>🏆View Results</Link>
         </nav>
 
         <main style={styles.content}>{children}</main>
