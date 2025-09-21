@@ -179,9 +179,9 @@ function ResultsPage({ token }) {
     // Cleanup on unmount
     return () => {
       clearInterval(fireworksInterval);
-      clearInterval(balloonInterval);
+    //   clearInterval(balloonInterval);
       clearInterval(sparkleInterval);
-      clearInterval(confettiInterval);
+    //   clearInterval(confettiInterval);
     };
   }, [token]);
 
@@ -251,16 +251,15 @@ function ResultsPage({ token }) {
       {/* Candidate list (kept simple) */}
       <ul style={styles.list}>
         {results.map(c => (
-          <li
-            key={c.id}
-            style={{
-              ...styles.listItem,
-              fontWeight: c.id === winner?.id ? 700 : 400,
-              color: c.id === winner?.id ? '#f43f5e' : '#1f2937'
-            }}
-          >
-            {c.symbol || '🗳️'} {c.name} → {c.votes} votes
-          </li>
+          <li key={c.id} style={{ ...styles.listItem }}>
+  <img
+    src={`data:image/png;base64,${c.photo}`}
+    alt={c.name}
+    style={{ width: "40px", height: "40px", borderRadius: "50%", marginRight: "8px" }}
+  />
+  {c.name} → {c.votes} votes
+</li>
+
         ))}
       </ul>
     </div>
